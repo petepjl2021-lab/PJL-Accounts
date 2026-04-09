@@ -1,0 +1,241 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USERS ────────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("STAFF") // ADMIN | STAFF
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignedProspects  Prospect[]  @relation("ProspectAssignee")
+  assignedTaxReturns TaxReturn[] @relation("TaxReturnAssignee")
+  assignedTasks      Task[]      @relation("TaskAssignee")
+  createdTasks       Task[]      @relation("TaskCreator")
+
+  // NextAuth sessions
+  sessions Session[]
+  accounts Account[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── CLIENTS ──────────────────────────────────────────────────────────────────
+
+model Client {
+  id          String  @id @default(cuid())
+  ref         String  @unique // e.g. PJL001
+  name        String
+  companyName String?
+  // INDIVIDUAL | SOLE_TRADER | PARTNERSHIP | LIMITED_COMPANY | LLP | TRUST
+  clientType  String  @default("INDIVIDUAL")
+  email       String?
+  phone       String?
+  address     String?
+  postcode    String?
+  utr         String? // Unique Taxpayer Reference
+  nino        String? // National Insurance Number
+  companyNo   String? // Companies House number
+  vatNo       String?
+  // ACTIVE | INACTIVE | ARCHIVED
+  status      String  @default("ACTIVE")
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  onboarding   ClientOnboarding?
+  hmrcAuths    HMRCAuthorisation[]
+  taxReturns   TaxReturn[]
+  tasks        Task[]
+}
+
+// ─── PROSPECTS ────────────────────────────────────────────────────────────────
+
+model Prospect {
+  id             String    @id @default(cuid())
+  name           String
+  companyName    String?
+  email          String?
+  phone          String?
+  // REFERRAL | WEBSITE | SOCIAL_MEDIA | NETWORKING | ADVERTISEMENT | OTHER
+  source         String    @default("OTHER")
+  serviceTypes   String    @default("[]") // JSON array string
+  // NEW | CONTACTED | MEETING_ARRANGED | PROPOSAL_SENT | ENGAGED | LOST
+  status         String    @default("NEW")
+  estimatedFees  Float?
+  notes          String?
+  nextAction     String?
+  nextActionDate DateTime?
+  lostReason     String?
+  assignedToId   String?
+  assignedTo     User?     @relation("ProspectAssignee", fields: [assignedToId], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// ─── CLIENT ONBOARDING ────────────────────────────────────────────────────────
+
+model ClientOnboarding {
+  id       String @id @default(cuid())
+  clientId String @unique
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // INITIAL_CONTACT | AML | ENGAGEMENT_LETTER | HMRC_SETUP | SOFTWARE_SETUP | COMPLETED
+  stage String @default("INITIAL_CONTACT")
+
+  // AML / KYC checks
+  // PENDING | IN_PROGRESS | COMPLETED | FAILED
+  amlStatus        String   @default("PENDING")
+  amlCompletedDate DateTime?
+  idVerified       Boolean  @default(false)
+  addressVerified  Boolean  @default(false)
+  amlNotes         String?
+
+  // Engagement letter
+  engagementLetterSent   DateTime?
+  engagementLetterSigned DateTime?
+
+  // Terms of business
+  termsAccepted Boolean   @default(false)
+  termsDate     DateTime?
+
+  // HMRC
+  hmrcOnlineSetup    Boolean @default(false)
+  agentAuthRequested Boolean @default(false)
+
+  // Software / bookkeeping
+  softwareSetup Boolean @default(false)
+  softwareName  String?
+
+  // Practice management
+  conflictCheckDone Boolean @default(false)
+  ddSetup           Boolean @default(false)
+
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ─── HMRC AUTHORISATIONS ──────────────────────────────────────────────────────
+
+model HMRCAuthorisation {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // SELF_ASSESSMENT | PAYE | CORPORATION_TAX | VAT | CIS | ITSA | SA_TRUST | SA_PARTNERSHIP
+  type String
+
+  // NOT_STARTED | FORM_SENT | PENDING_HMRC | AUTHORISED | REJECTED | EXPIRED
+  status         String    @default("NOT_STARTED")
+  form64_8Sent   DateTime?
+  authorisedDate DateTime?
+  expiryDate     DateTime?
+  agentRef       String?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([clientId, type])
+}
+
+// ─── TAX RETURNS ──────────────────────────────────────────────────────────────
+
+model TaxReturn {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // SA100 | SA800 | SA900 | CT600 | VAT_RETURN | P11D | P35
+  type    String
+  taxYear String // e.g. "2023/24"
+
+  dueDate DateTime
+
+  // NOT_STARTED | INFO_REQUESTED | INFO_RECEIVED | IN_PROGRESS | REVIEW |
+  // SENT_TO_CLIENT | CLIENT_APPROVED | FILED | OVERDUE
+  status String @default("NOT_STARTED")
+
+  infoRequestedDate  DateTime?
+  infoReceivedDate   DateTime?
+  preparedDate       DateTime?
+  reviewedDate       DateTime?
+  sentToClientDate   DateTime?
+  clientApprovedDate DateTime?
+  filedDate          DateTime?
+
+  hmrcReference String?
+  taxChargeable Float?
+  taxPayable    Float?
+  paymentDueDate DateTime?
+
+  notes        String?
+  assignedToId String?
+  assignedTo   User?   @relation("TaxReturnAssignee", fields: [assignedToId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── TASKS ────────────────────────────────────────────────────────────────────
+
+model Task {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+  clientId    String?
+  client      Client? @relation(fields: [clientId], references: [id])
+
+  // TODO | IN_PROGRESS | DONE | CANCELLED
+  status String @default("TODO")
+  // LOW | MEDIUM | HIGH | URGENT
+  priority String @default("MEDIUM")
+
+  dueDate     DateTime?
+  completedAt DateTime?
+
+  assignedToId String?
+  assignedTo   User?   @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  createdById  String?
+  createdBy    User?   @relation("TaskCreator", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

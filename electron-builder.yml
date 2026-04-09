@@ -1,0 +1,52 @@
+appId: com.pjl.accounts
+productName: PJL Accounts
+copyright: Copyright © 2024 PJL Accounts
+
+directories:
+  output: dist
+  buildResources: resources
+
+files:
+  - electron/dist/**/*
+  - .next/standalone/**/*
+  - .next/static/**/*
+  - public/**/*
+  - prisma/schema.prisma
+  - node_modules/.prisma/**/*
+  - node_modules/@prisma/client/**/*
+  - package.json
+
+extraResources:
+  - from: .next/standalone
+    to: app
+  - from: .next/static
+    to: app/.next/static
+  - from: public
+    to: app/public
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/icon.ico
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: PJL Accounts
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+
+mac:
+  target: dmg
+  icon: resources/icon.icns
+  category: public.app-category.business
+
+linux:
+  target: AppImage
+  icon: resources/icon.png
+  category: Office
