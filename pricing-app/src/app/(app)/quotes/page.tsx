@@ -29,13 +29,15 @@ export default function QuotesPage() {
     fetcher
   )
 
+  const safeQuotes = Array.isArray(quotes) ? quotes : []
+
   return (
     <div className="p-8">
       <div className="page-header">
         <div>
           <h1 className="page-title">Saved Quotes</h1>
           <p className="text-slate-500 text-sm mt-1">
-            {quotes?.length ?? 0} quote{quotes?.length !== 1 ? 's' : ''} found
+            {safeQuotes.length} quote{safeQuotes.length !== 1 ? 's' : ''} found
           </p>
         </div>
         <Link href="/calculator" className="btn-primary">
@@ -71,7 +73,7 @@ export default function QuotesPage() {
       <div className="card overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center text-slate-400">Loading quotes…</div>
-        ) : !quotes?.length ? (
+        ) : !safeQuotes.length ? (
           <div className="p-12 text-center">
             <DocumentTextIcon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
             <p className="text-slate-500 font-medium">No quotes yet</p>
@@ -96,7 +98,7 @@ export default function QuotesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {quotes.map(quote => (
+              {safeQuotes.map(quote => (
                 <tr key={quote.id} className="table-row-hover">
                   <td className="px-4 py-3 text-sm text-slate-500">
                     <Link href={`/quotes/${quote.id}`} className="block">

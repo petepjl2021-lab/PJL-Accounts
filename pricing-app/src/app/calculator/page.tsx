@@ -85,11 +85,13 @@ export default function CalculatorPage() {
     return null
   }
 
-  const safePackages = packages ?? []
-  const safeBands    = bands    ?? []
-  const safeAddOns   = addOns   ?? []
-  const safeOneOffs  = oneOffs  ?? []
-  const safePresets  = presets  ?? []
+  // Use Array.isArray so that a { error: '...' } response from the API
+  // (e.g. during session initialisation) doesn't cause .find() to crash.
+  const safePackages = Array.isArray(packages) ? packages : []
+  const safeBands    = Array.isArray(bands)    ? bands    : []
+  const safeAddOns   = Array.isArray(addOns)   ? addOns   : []
+  const safeOneOffs  = Array.isArray(oneOffs)  ? oneOffs  : []
+  const safePresets  = Array.isArray(presets)  ? presets  : []
 
   // Live totals calculation
   const selectedPackage = safePackages.find(p => p.id === state.selectedPackageId) ?? null
