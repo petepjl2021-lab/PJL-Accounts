@@ -1,0 +1,268 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("STAFF")  // ADMIN | STAFF
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions Session[]
+  accounts Account[]
+  quotes   Quote[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── PRICING CONFIGURATION ────────────────────────────────────────────────────
+
+// Singleton row — always id = "singleton"
+model PricingConfig {
+  id   String @id @default("singleton")
+
+  // Branding (white-label foundations)
+  firmName     String @default("PJL Accounts")
+  tagline      String @default("Your trusted accountancy partner")
+  accentColour String @default("#2563eb")
+
+  // Calculator copy
+  disclaimerText String @default("This is a rough guide — I'll confirm exact fees once I know more about your business.")
+  closingLine    String @default("Can I arrange a discovery call?")
+
+  // Package display names (renameable)
+  packageOneName   String @default("Base")
+  packageTwoName   String @default("Boost")
+  packageThreeName String @default("Beyond")
+
+  // Package emoji/icons for display
+  packageOneEmoji   String @default("📦")
+  packageTwoEmoji   String @default("🚀")
+  packageThreeEmoji String @default("⭐")
+
+  // Package taglines shown on cards
+  packageOneTagline   String @default("Core compliance — everything you're legally required to have")
+  packageTwoTagline   String @default("Compliance + proactive tax planning to save you money")
+  packageThreeTagline String @default("Full strategic support — your outsourced Finance Director")
+
+  updatedAt DateTime @updatedAt
+}
+
+// ─── PRICING PACKAGES ─────────────────────────────────────────────────────────
+
+model PricingPackage {
+  id   String @id @default(cuid())
+  // TIER_ONE | TIER_TWO | TIER_THREE
+  tier String @unique
+
+  // Base monthly prices per business type (ex-VAT)
+  priceSoleTrader  Float @default(0)
+  pricePartnership Float @default(0)
+  priceLtd         Float @default(0)
+  priceIndividual  Float @default(0)
+
+  // JSON array of service strings included in this tier
+  includedServices String @default("[]")
+
+  // Whether this tier is highlighted as "recommended" in the UI
+  highlighted Boolean @default(false)
+
+  // Whether this tier is available to select
+  enabled Boolean @default(true)
+
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  quotes Quote[]
+}
+
+// ─── TURNOVER BANDS ───────────────────────────────────────────────────────────
+
+model TurnoverBand {
+  id          String @id @default(cuid())
+  label       String  // e.g. "Up to £50,000"
+  minTurnover Float   // inclusive lower bound
+  maxTurnover Float?  // null = no upper limit (top band)
+  multiplier  Float   @default(1.0)
+  sortOrder   Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── MONTHLY ADD-ONS ──────────────────────────────────────────────────────────
+
+model PricingAddOn {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  // GENERAL | VAT | PAYROLL | BOOKKEEPING | CIS | SOFTWARE | MANAGEMENT | TAX
+  category String @default("GENERAL")
+
+  // Pricing structure
+  basePrice           Float?  // null = TBC / Pete to price
+  includedUnits       Int     @default(1)    // units included in base price
+  additionalUnitPrice Float?  // £ per unit above includedUnits (null = no incremental)
+
+  // Display
+  unitLabel    String  @default("month")  // "employee", "subcontractor", "return", "director"
+  hasQuantity  Boolean @default(false)    // show quantity spinner?
+  minQuantity  Int     @default(1)
+  maxQuantity  Int     @default(50)
+  hasFrequency Boolean @default(false)    // show frequency selector (monthly/quarterly)?
+
+  enabled   Boolean @default(true)
+  sortOrder Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  quoteAddOns QuoteAddOn[]
+}
+
+// ─── ONE-OFF FEES ─────────────────────────────────────────────────────────────
+
+model OneOffFee {
+  id       String  @id @default(cuid())
+  name     String
+  // HMRC | COMPANIES_HOUSE | ADVISORY | GENERAL
+  category String  @default("GENERAL")
+  price    Float
+
+  enabled   Boolean @default(true)
+  sortOrder Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  quoteOneOffs QuoteOneOff[]
+}
+
+// ─── INDUSTRY PRESETS ─────────────────────────────────────────────────────────
+
+model IndustryPreset {
+  id          String  @id @default(cuid())
+  name        String  // "General", "Construction (CIS)"
+  code        String  @unique  // "GENERAL", "CONSTRUCTION"
+  description String?
+  // JSON array of PricingAddOn IDs to pre-select
+  defaultAddOnIds String @default("[]")
+  sortOrder   Int     @default(0)
+  enabled     Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── QUOTES ───────────────────────────────────────────────────────────────────
+
+model Quote {
+  id String @id @default(cuid())
+
+  // Who created it
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+
+  // Client info (captured at quote time)
+  clientName      String
+  clientEmail     String?
+  businessType    String  // SOLE_TRADER | LIMITED_COMPANY | PARTNERSHIP | INDIVIDUAL
+  isExistingClient Boolean @default(false)
+  industry        String  @default("GENERAL")
+
+  // Pricing inputs (snapshots for immutability)
+  turnoverBandId    String?
+  turnoverBandLabel String?
+  turnoverMultiplier Float   @default(1.0)
+
+  // Selected package (snapshot)
+  packageId        String?
+  package          PricingPackage? @relation(fields: [packageId], references: [id])
+  packageNameSnap  String?   // snapshot of name at time of quoting
+  baseMonthlyFee   Float     @default(0)  // package price after multiplier
+
+  // Totals (ex-VAT)
+  addOnsMonthlyFee Float @default(0)
+  monthlyTotal     Float @default(0)
+  annualTotal      Float @default(0)
+  oneOffTotal      Float @default(0)
+
+  // Status: DRAFT | SENT | ACCEPTED | DECLINED | ARCHIVED
+  status String @default("DRAFT")
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  addOns  QuoteAddOn[]
+  oneOffs QuoteOneOff[]
+}
+
+model QuoteAddOn {
+  id      String @id @default(cuid())
+  quoteId String
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  addOnId String
+  addOn   PricingAddOn @relation(fields: [addOnId], references: [id])
+
+  // Snapshots at time of quoting
+  nameSnap     String
+  quantity     Int    @default(1)
+  frequency    String @default("MONTHLY")  // MONTHLY | QUARTERLY
+  unitPrice    Float  // effective price per unit (after incremental calc)
+  monthlyTotal Float  // final monthly contribution (adjusted for frequency)
+
+  createdAt DateTime @default(now())
+
+  @@unique([quoteId, addOnId])
+}
+
+model QuoteOneOff {
+  id       String @id @default(cuid())
+  quoteId  String
+  quote    Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  feeId    String
+  fee      OneOffFee @relation(fields: [feeId], references: [id])
+
+  // Snapshot at time of quoting
+  nameSnap  String
+  price     Float
+
+  createdAt DateTime @default(now())
+
+  @@unique([quoteId, feeId])
+}
