@@ -22,17 +22,17 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 // ─── Wizard reducer ─────────────────────────────────────────────────────────
 
 const INITIAL_STATE: WizardState = {
-  step:             1,
-  clientName:       '',
-  clientEmail:      '',
-  businessType:     'LIMITED_COMPANY',
-  isExistingClient: false,
-  industry:         'GENERAL',
-  turnoverBandId:   '',
+  step:              1,
+  clientName:        '',
+  clientEmail:       '',
+  businessType:      'LIMITED_COMPANY',
+  isExistingClient:  false,
+  industry:          'GENERAL',
+  turnoverBandId:    '',
   selectedPackageId: null,
-  selectedAddOns:   [],
+  selectedAddOns:    [],
   selectedOneOffIds: [],
-  notes:            '',
+  notes:             '',
 }
 
 type Action =
@@ -47,15 +47,13 @@ function wizardReducer(state: WizardState, action: Action): WizardState {
       return { ...state, ...action.payload }
     case 'NEXT': {
       const steps: Array<WizardState['step']> = [1, 2, 3, 'summary']
-      const idx = steps.indexOf(state.step)
-      const next = steps[Math.min(idx + 1, steps.length - 1)]
-      return { ...state, step: next }
+      const idx  = steps.indexOf(state.step)
+      return { ...state, step: steps[Math.min(idx + 1, steps.length - 1)] }
     }
     case 'BACK': {
       const steps: Array<WizardState['step']> = [1, 2, 3, 'summary']
-      const idx = steps.indexOf(state.step)
-      const prev = steps[Math.max(idx - 1, 0)]
-      return { ...state, step: prev }
+      const idx  = steps.indexOf(state.step)
+      return { ...state, step: steps[Math.max(idx - 1, 0)] }
     }
     case 'RESET':
       return { ...INITIAL_STATE }
@@ -70,6 +68,8 @@ export default function CalculatorPage() {
   const { status } = useSession()
   const router     = useRouter()
 
+  // ── All hooks must be called unconditionally before any early return ────────
+
   const [state, dispatch] = useReducer(wizardReducer, INITIAL_STATE)
 
   const { data: config }   = useSWR<PricingConfig>('/api/pricing/config', fetcher)
@@ -79,35 +79,45 @@ export default function CalculatorPage() {
   const { data: oneOffs }  = useSWR<OneOffFee[]>('/api/pricing/oneoffs', fetcher)
   const { data: presets }  = useSWR<ParsedIndustryPreset[]>('/api/pricing/presets', fetcher)
 
-  // Redirect to sign in if unauthenticated
-  if (status === 'unauthenticated') {
-    router.push('/signin')
-    return null
-  }
-
-  // Use Array.isArray so that a { error: '...' } response from the API
-  // (e.g. during session initialisation) doesn't cause .find() to crash.
+  // Array.isArray guards ensure a { error: '...' } API response (returned while
+  // the session is still initialising) never reaches .find() as a non-array.
   const safePackages = Array.isArray(packages) ? packages : []
   const safeBands    = Array.isArray(bands)    ? bands    : []
   const safeAddOns   = Array.isArray(addOns)   ? addOns   : []
   const safeOneOffs  = Array.isArray(oneOffs)  ? oneOffs  : []
   const safePresets  = Array.isArray(presets)  ? presets  : []
 
-  // Live totals calculation
   const selectedPackage = safePackages.find(p => p.id === state.selectedPackageId) ?? null
   const selectedBand    = safeBands.find(b => b.id === state.turnoverBandId) ?? null
 
+  // useMemo is a hook — must be called here, BEFORE any early return
   const totals = useMemo(() => calculateTotals({
-    businessType:     state.businessType,
+    businessType:      state.businessType,
     selectedPackage,
     selectedBand,
-    selectedAddOns:   state.selectedAddOns,
+    selectedAddOns:    state.selectedAddOns,
     selectedOneOffIds: state.selectedOneOffIds,
-    addOns:           safeAddOns,
-    oneOffs:          safeOneOffs,
+    addOns:            safeAddOns,
+    oneOffs:           safeOneOffs,
   }), [state, selectedPackage, selectedBand, safeAddOns, safeOneOffs])
 
-  // Resolve package display name
+  // ── Early returns AFTER all hooks ───────────────────────────────────────────
+
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <p className="text-slate-400 text-sm">Loading…</p>
+      </div>
+    )
+  }
+
+  if (status === 'unauthenticated') {
+    router.push('/signin')
+    return null
+  }
+
+  // ── Derived values (not hooks) ──────────────────────────────────────────────
+
   function getPackageName(tier: string): string {
     if (!config) return tier
     const map: Record<string, string> = {
@@ -120,22 +130,24 @@ export default function CalculatorPage() {
 
   const pkgName = selectedPackage ? getPackageName(selectedPackage.tier) : '—'
 
-  // Apply industry preset add-ons when step changes from 1→2 to 2→3
   function handleStepForward() {
     if (state.step === 2) {
-      // When entering step 3, apply preset defaults if no add-ons selected yet
       const preset = safePresets.find(p => p.code === state.industry)
       if (preset && state.selectedAddOns.length === 0 && preset.defaultAddOnIds.length > 0) {
         const presetAddOns = preset.defaultAddOnIds
           .map(id => safeAddOns.find(a => a.id === id))
           .filter(Boolean) as PricingAddOn[]
 
-        const newSelections = presetAddOns.map(a => ({
-          addOnId:   a.id,
-          quantity:  a.minQuantity,
-          frequency: 'MONTHLY' as const,
-        }))
-        dispatch({ type: 'PATCH', payload: { selectedAddOns: newSelections } })
+        dispatch({
+          type: 'PATCH',
+          payload: {
+            selectedAddOns: presetAddOns.map(a => ({
+              addOnId:   a.id,
+              quantity:  a.minQuantity,
+              frequency: 'MONTHLY' as const,
+            })),
+          },
+        })
       }
     }
     dispatch({ type: 'NEXT' })
@@ -143,11 +155,12 @@ export default function CalculatorPage() {
 
   const showLiveBar = state.step === 2 || state.step === 3 || state.step === 'summary'
 
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
 
-      {/* Main content — offset by sidebar width */}
       <main className="flex-1 ml-60 flex flex-col min-h-screen">
         {/* Top bar */}
         <div className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-10">
@@ -218,7 +231,6 @@ export default function CalculatorPage() {
           </div>
         </div>
 
-        {/* Live price bar — shown from step 2 onwards */}
         {showLiveBar && selectedPackage && (
           <PriceLiveBar totals={totals} packageName={pkgName} />
         )}
