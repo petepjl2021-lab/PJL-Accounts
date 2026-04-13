@@ -27,7 +27,8 @@ async function main() {
   console.log(`✓ Admin user: ${email}`)
 
   // ─── Pricing data ──────────────────────────────────────────────────────────
-  await seedPricingData(prisma)
+  const firmName = process.env.SEED_FIRM_NAME
+  await seedPricingData(prisma, firmName)
 
   console.log('✓ Pricing packages (3 tiers)')
   console.log('✓ Turnover bands (5)')

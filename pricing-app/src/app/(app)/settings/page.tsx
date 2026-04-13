@@ -175,6 +175,48 @@ function BrandingTab({ config, onSaved }: { config: PricingConfig; onSaved: (msg
         </div>
       </div>
 
+      {/* Company Logo */}
+      <div className="card p-6 space-y-4">
+        <h2 className="font-semibold text-slate-900">Company Logo</h2>
+        <p className="text-slate-500 text-sm">
+          Shown in the sidebar and on the client presentation view. PNG, JPG or SVG recommended. Keep under 300 KB for best performance.
+        </p>
+        {form.logoUrl && (
+          <div className="flex items-center gap-4 p-3 bg-slate-50 rounded-lg border border-slate-200 w-fit">
+            <img src={form.logoUrl} alt="Company logo preview" className="h-12 max-w-[180px] object-contain" />
+            <button
+              type="button"
+              onClick={() => setForm(f => ({ ...f, logoUrl: null }))}
+              className="text-sm text-red-500 hover:text-red-700 font-medium"
+            >
+              Remove
+            </button>
+          </div>
+        )}
+        <div>
+          <label className="label-base">Upload Logo</label>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              if (file.size > 300 * 1024) {
+                alert('Logo must be under 300 KB. Please resize your image and try again.')
+                e.target.value = ''
+                return
+              }
+              const reader = new FileReader()
+              reader.onloadend = () => {
+                setForm(f => ({ ...f, logoUrl: reader.result as string }))
+              }
+              reader.readAsDataURL(file)
+            }}
+            className="input-base"
+          />
+        </div>
+      </div>
+
       {/* Package names */}
       <div className="card p-6 space-y-4">
         <h2 className="font-semibold text-slate-900">Package Names & Presentation</h2>

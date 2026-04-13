@@ -31,7 +31,7 @@ export async function PATCH(req: NextRequest) {
 
   // Only allow specific fields to be updated
   const allowed = [
-    'firmName', 'tagline', 'accentColour',
+    'firmName', 'tagline', 'accentColour', 'logoUrl',
     'disclaimerText', 'closingLine',
     'packageOneName', 'packageTwoName', 'packageThreeName',
     'packageOneEmoji', 'packageTwoEmoji', 'packageThreeEmoji',

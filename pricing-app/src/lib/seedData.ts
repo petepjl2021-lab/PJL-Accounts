@@ -4,12 +4,12 @@ import type { PrismaClient } from '@prisma/client'
  * Idempotent seed of all default pricing data.
  * Safe to run multiple times — uses upsert on stable keys.
  */
-export async function seedPricingData(prisma: PrismaClient) {
+export async function seedPricingData(prisma: PrismaClient, firmName?: string) {
   // ─── Pricing Config (singleton) ─────────────────────────────────────────────
   await prisma.pricingConfig.upsert({
     where:  { id: 'singleton' },
     update: {},
-    create: { id: 'singleton' },
+    create: { id: 'singleton', ...(firmName ? { firmName } : {}) },
   })
 
   // ─── Packages ────────────────────────────────────────────────────────────────

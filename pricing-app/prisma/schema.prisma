@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -58,9 +58,10 @@ model PricingConfig {
   id   String @id @default("singleton")
 
   // Branding (white-label foundations)
-  firmName     String @default("PJL Accounts")
-  tagline      String @default("Your trusted accountancy partner")
-  accentColour String @default("#2563eb")
+  firmName     String  @default("PJL Accounts")
+  tagline      String  @default("Your trusted accountancy partner")
+  accentColour String  @default("#2563eb")
+  logoUrl      String? // base64 data URL of uploaded logo
 
   // Calculator copy
   disclaimerText String @default("This is a rough guide — I'll confirm exact fees once I know more about your business.")

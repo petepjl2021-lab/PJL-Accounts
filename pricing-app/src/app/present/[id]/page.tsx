@@ -75,9 +75,17 @@ export default function PresentationPage() {
       {/* Toolbar — hidden when printing */}
       <div className="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center justify-between print:hidden">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600">
-            <BuildingOffice2Icon className="w-4 h-4 text-white" />
-          </div>
+          {config?.logoUrl ? (
+            <img
+              src={config.logoUrl}
+              alt={config.firmName ?? 'Firm logo'}
+              className="h-8 w-auto max-w-[120px] object-contain"
+            />
+          ) : (
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600">
+              <BuildingOffice2Icon className="w-4 h-4 text-white" />
+            </div>
+          )}
           <span className="text-white font-semibold text-sm">
             {config?.firmName ?? 'Pricing Calculator'}
           </span>

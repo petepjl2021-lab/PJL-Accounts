@@ -33,9 +33,17 @@ export function Sidebar() {
     <aside className="fixed inset-y-0 left-0 w-60 bg-slate-900 flex flex-col z-20 print:hidden">
       {/* Branding */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-800">
-        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-600 shrink-0">
-          <BuildingOffice2Icon className="w-5 h-5 text-white" />
-        </div>
+        {config?.logoUrl ? (
+          <img
+            src={config.logoUrl}
+            alt={firmName}
+            className="h-9 w-auto max-w-[100px] object-contain shrink-0"
+          />
+        ) : (
+          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-600 shrink-0">
+            <BuildingOffice2Icon className="w-5 h-5 text-white" />
+          </div>
+        )}
         <div>
           <p className="text-white font-semibold text-sm leading-tight truncate">{firmName}</p>
           <p className="text-slate-400 text-xs">Pricing Calculator</p>
