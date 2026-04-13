@@ -52,17 +52,24 @@ export default function SettingsPage() {
 
   const user = session?.user as { role?: string } | undefined
 
+  // All hooks must be called before any conditional return
+  const { data: config }   = useSWR<PricingConfig>('/api/pricing/config', fetcher)
+  const { data: packages } = useSWR<PricingPackage[]>('/api/pricing/packages', fetcher)
+  const { data: bands }    = useSWR<TurnoverBand[]>('/api/pricing/bands', fetcher)
+  const { data: addOns }   = useSWR<PricingAddOn[]>('/api/pricing/addons?all=1', fetcher)
+  const { data: oneOffs }  = useSWR<OneOffFee[]>('/api/pricing/oneoffs?all=1', fetcher)
+
+  // Safe arrays — guard against API returning {error: '...'} during session init
+  const safePackages = Array.isArray(packages) ? packages : []
+  const safeBands    = Array.isArray(bands)    ? bands    : []
+  const safeAddOns   = Array.isArray(addOns)   ? addOns   : []
+  const safeOneOffs  = Array.isArray(oneOffs)  ? oneOffs  : []
+
   // Redirect non-admins
   if (status !== 'loading' && user?.role !== 'ADMIN') {
     router.push('/calculator')
     return null
   }
-
-  const { data: config }  = useSWR<PricingConfig>('/api/pricing/config', fetcher)
-  const { data: packages } = useSWR<PricingPackage[]>('/api/pricing/packages', fetcher)
-  const { data: bands }   = useSWR<TurnoverBand[]>('/api/pricing/bands', fetcher)
-  const { data: addOns }  = useSWR<PricingAddOn[]>('/api/pricing/addons?all=1', fetcher)
-  const { data: oneOffs } = useSWR<OneOffFee[]>('/api/pricing/oneoffs?all=1', fetcher)
 
   async function handleReset() {
     setResetting(true)
@@ -112,11 +119,11 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {tab === 'branding'  && config   && <BrandingTab  config={config}   onSaved={setToast} />}
-      {tab === 'packages'  && packages  && <PackagesTab  packages={packages} onSaved={setToast} />}
-      {tab === 'bands'     && bands     && <BandsTab     bands={bands}     onSaved={setToast} />}
-      {tab === 'addons'    && addOns    && <AddOnsTab    addOns={addOns}   onSaved={setToast} />}
-      {tab === 'oneoffs'   && oneOffs   && <OneOffsTab   oneOffs={oneOffs} onSaved={setToast} />}
+      {tab === 'branding'  && config                && <BrandingTab  config={config}          onSaved={setToast} />}
+      {tab === 'packages'  && safePackages.length > 0 && <PackagesTab  packages={safePackages}  onSaved={setToast} />}
+      {tab === 'bands'     && safeBands.length > 0    && <BandsTab     bands={safeBands}         onSaved={setToast} />}
+      {tab === 'addons'    && safeAddOns.length > 0   && <AddOnsTab    addOns={safeAddOns}       onSaved={setToast} />}
+      {tab === 'oneoffs'   && safeOneOffs.length > 0  && <OneOffsTab   oneOffs={safeOneOffs}     onSaved={setToast} />}
 
       {toast && <Toast message={toast} onDone={() => setToast('')} />}
 
@@ -271,7 +278,11 @@ function PackagesTab({ packages, onSaved }: { packages: PricingPackage[]; onSave
   const [items, setItems] = useState<PkgEdit[]>(
     packages.map(p => ({
       ...p,
-      includedServicesArr: JSON.parse(p.includedServices) as string[],
+      // The packages API already parses includedServices to string[].
+      // Guard with Array.isArray in case the raw JSON string is passed.
+      includedServicesArr: Array.isArray(p.includedServices)
+        ? (p.includedServices as unknown as string[])
+        : JSON.parse(p.includedServices) as string[],
     }))
   )
   const [saving, setSaving] = useState(false)
