@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── CLIENTS ──────────────────────────────────────────────────────────────────
+
+model Client {
+  id                String   @id @default(cuid())
+  name              String
+  companyNumber     String?
+  accountingStandard String  @default("FRS-105") // FRS-105 | FRS-102
+  folderPath        String? // default export location for this client's jobs
+  notes             String?
+  archived          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  jobs Job[]
+}
+
+// ─── JOBS (one per accounting year) ────────────────────────────────────────────
+
+model Job {
+  id           String   @id @default(cuid())
+  clientId     String
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  yearEndDate  DateTime
+  preparedBy   String?
+  preparedDate DateTime?
+  reviewedBy   String?
+  reviewedDate DateTime?
+
+  // JSON array of schedule keys ticked as required for this job, e.g. ["trialBalance","bankReconciliation",...]
+  requiredSchedules String @default("[]")
+
+  // NOT_STARTED | IN_PROGRESS | COMPLETED
+  status String @default("IN_PROGRESS")
+
+  exportedAt   DateTime?
+  exportPath   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  schedules ScheduleRecord[]
+
+  @@unique([clientId, yearEndDate])
+}
+
+// ─── SCHEDULE DATA (one row per schedule per job) ──────────────────────────────
+
+model ScheduleRecord {
+  id     String @id @default(cuid())
+  jobId  String
+  job    Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  key  String // matches ScheduleKey in src/lib/schedules.ts, e.g. "trialBalance"
+  // Freeform JSON payload — shape depends on schedule key, see src/lib/schedules.ts
+  data String @default("{}")
+
+  // NOT_STARTED | IN_PROGRESS | DONE
+  status       String    @default("NOT_STARTED")
+  preparedBy   String?
+  preparedDate DateTime?
+  reviewedBy   String?
+  reviewedDate DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([jobId, key])
+}
